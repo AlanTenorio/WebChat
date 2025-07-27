@@ -21,13 +21,12 @@ const colors = [
 const user = { id: "", name: "", color: "" }
 
 let websocket
+let isFirstConnection = true // Flag para saber se está recebendo histórico
 
 const createMessageSelfElement = (content) => {
     const div = document.createElement("div")
-
     div.classList.add("message--self")
     div.innerHTML = content
-
     return div
 }
 
@@ -36,13 +35,11 @@ const createMessageOtherElement = (content, sender, senderColor) => {
     const span = document.createElement("span")
 
     div.classList.add("message--other")
-
     span.classList.add("message--sender")
     span.style.color = senderColor
+    span.innerHTML = sender
 
     div.appendChild(span)
-
-    span.innerHTML = sender
     div.innerHTML += content
 
     return div
@@ -63,13 +60,15 @@ const scrollScreen = () => {
 const processMessage = ({ data }) => {
     const { userId, userName, userColor, content } = JSON.parse(data)
 
+    // Se for histórico, sempre exibe como "other"
+    const isHistory = isFirstConnection
+
     const message =
-        userId == user.id
+        !isHistory && userId === user.id
             ? createMessageSelfElement(content)
             : createMessageOtherElement(content, userName, userColor)
 
     chatMessages.appendChild(message)
-
     scrollScreen()
 }
 
@@ -84,7 +83,17 @@ const handleLogin = (event) => {
     chat.style.display = "flex"
 
     websocket = new WebSocket("wss://chat-backend-1p64.onrender.com")
-    websocket.onmessage = processMessage
+
+    websocket.onmessage = (event) => {
+        processMessage(event)
+
+        // Após receber as primeiras mensagens (histórico), desativa a flag
+        if (isFirstConnection) {
+            setTimeout(() => {
+                isFirstConnection = false
+            }, 1000) // tempo curto para garantir que o histórico chegou antes da flag mudar
+        }
+    }
 }
 
 const sendMessage = (event) => {
@@ -98,7 +107,6 @@ const sendMessage = (event) => {
     }
 
     websocket.send(JSON.stringify(message))
-
     chatInput.value = ""
 }
 
